@@ -292,8 +292,12 @@ class LDIFParser:
     """
     Unfold several folded lines with trailing space into one line
     """
-    unfolded_lines = [ self._stripLineSep(str(self._line)) ]
-    self._line = str(self._input_file.readline())
+    # do we have strings or bytes?
+    try:
+      unfolded_lines = [ self._stripLineSep(str(self._line, 'utf-8')) ]
+    except TypeError:
+      unfolded_lines = [ self._stripLineSep(self._line) ]
+    self._line = self._input_file.readline().decode('utf-8')
     while self._line and self._line[0]==' ':
       unfolded_lines.append(self._stripLineSep(self._line[1:]))
       self._line = self._input_file.readline()
