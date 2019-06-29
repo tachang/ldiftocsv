@@ -52,7 +52,8 @@ dn: cn=Bill\, Kim and Family,mail=abc@example.com
 # One of the issues with this is that a lot of spreadsheet programs will only support
 # a maximum number of columns. Suppose a multivalued attribute had 200 or so values.
 # This would eat up 200 columns. OpenOffice's maximum number of columns is 1024.
-
+
+
 # A handler that simply throws away any logging messages sent to it
 class NullHandler(logging.Handler):
   def emit(self,record):
@@ -184,9 +185,6 @@ def parseLDIFAttributes(filename):
   return attributeParser.attributeDictionary
 
 
-  
-  
-  
 def generateCSV(attributeDictionary, filename, output, fieldSeparatorCharacter = ",", textDelimiter = "\"", maximumColumns = 5 ):
   # Open the LDIF file for reading
   LDIFFile = open(filename,"rb")
@@ -226,6 +224,7 @@ def generateCSV(attributeDictionary, filename, output, fieldSeparatorCharacter =
 
   # Write a newline to end the file
   output.write("\n")
+  LDIFFile.close()
 
 def setupLogging(logfilename=""):
   # Create the primaryLogger as a global variable
@@ -275,7 +274,8 @@ def usage():
   sys.stdout.write("\t\t  Do you want to have 20 columns each with the same heading objectClass or do you want to limit it.\n") 
   
   sys.stdout.write("\n")
-  """
+
+  """
 
 # Primary function call 
 def main():
@@ -292,13 +292,13 @@ def main():
   # Use getopt to get all the options that might be present
   try:
     optionValueList, remainingItems  = getopt.getopt(sys.argv[1:], "o:l:F:D:M:")
-  except getopt.GetoptError, exceptionObject:
-    print str(exceptionObject)
+  except getopt.GetoptError as exceptionObject:
+    print(str(exceptionObject))
     usage()
     sys.exit(2)
 
   if( len(remainingItems) < 1 ):
-    print "Error: Expecting single filename argument at end of command line.\n"
+    print("Error: Expecting single filename argument at end of command line.\n")
     usage()
     sys.exit(2)
 
