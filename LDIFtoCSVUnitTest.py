@@ -9,7 +9,7 @@ class LDIFAttributeChecks(unittest.TestCase):
 
   def testBasic(self):
     attributeDictionary = LDIFtoCSV.parseLDIFAttributes(os.path.join (self.sampleLDIFLocation, "Root.ldif"))
-    print "Parsed attribute dictionary: " + repr(attributeDictionary)
+    print("Parsed attribute dictionary: " + repr(attributeDictionary))
     
     self.assertEqual(4, len(attributeDictionary))
 
@@ -37,7 +37,7 @@ class LDIFAttributeChecks(unittest.TestCase):
     self.assertEqual(2, attributeDictionary["cn"])
     self.assertEqual(1, attributeDictionary["sn"])
 
-    print "Parsed attribute dictionary: " + repr(attributeDictionary)
+    print("Parsed attribute dictionary: " + repr(attributeDictionary))
     
 
 if __name__ == "__main__":
