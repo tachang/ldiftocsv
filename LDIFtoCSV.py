@@ -110,7 +110,7 @@ class LDIFCSVParser(LDIFParser):
   def handle(self, dn, entry):
 
     # Get a list of all the attributes in the entire LDIF and sort them
-    allAttributeNames = self.attributeDictionary.keys()
+    allAttributeNames = list(self.attributeDictionary.keys())
     allAttributeNames.sort()
 
     # Loop through each of the attributes
@@ -197,7 +197,7 @@ def generateCSV(attributeDictionary, filename, output, fieldSeparatorCharacter =
   CSVParser.maximumColumns = maximumColumns
   
   # Print out the CSV header sorted
-  headerValues = attributeDictionary.keys()
+  headerValues = list(attributeDictionary.keys())
   headerValues.sort()
 
   # Count of the number of columns this CSV will have
