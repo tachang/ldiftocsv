@@ -60,8 +60,13 @@ def is_dn(s):
   """
   if s=='':
     return 1
-  rm = dn_regex.match(s)
-  return rm!=None and rm.group(0)==s
+  # those darn umlauts
+  encoded = s.encode('raw-unicode-escape')
+  new_s = str(encoded.decode('utf-8'))
+  rm = dn_regex.match(new_s)
+#   print("regex match", rm)
+#   print("new string", new_s)
+  return rm!=None and rm.group(0)==new_s
 
 
 def needs_base64(s):
@@ -325,7 +330,8 @@ class LDIFParser:
     value_spec = unfolded_line[colon_pos:colon_pos+2]
     if value_spec=='::':
       # attribute value needs base64-decoding
-      attr_value = base64.decodestring(unfolded_line[colon_pos+2:])
+#      attr_value = base64.decodestring(unfolded_line[colon_pos+2:])
+      attr_value = str(base64.b64decode(bytes(unfolded_line[colon_pos+2:], "utf=8")))
       #attr_value = unfolded_line[colon_pos+2:]
     elif value_spec==':<':
       # fetch attribute value from URL
