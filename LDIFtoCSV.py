@@ -186,22 +186,25 @@ class LDIFCSVParser(LDIFParser):
 
 # Parses an LDIF file to find out all the attribute names as well as how many of each kind of attribute
 # are in the file. Returns a dictionary of attributes and the maximum number of times that value appears.
-def parseLDIFAttributes(filename):
+def parseLDIFAttributes(filename, verbose=False):
     # Open the LDIF file for reading
     LDIFFile = open(filename, "rb")
-    primaryLogger.debug("Opened <%s> for reading" % filename)
+    if verbose:
+        print("Opened <%s> for reading" % filename)
 
     # Create an instance of the attribute parser which will handle LDIF entries
     attributeParser = LDIFAttributeParser(LDIFFile)
 
     # Perform the actual parsing using the AttributeParser
     # This first pass is only to obtain the attributes
-    primaryLogger.debug("Parsing <%s> for attributes" % filename)
+    if verbose:
+        print("Parsing <%s> for attributes" % filename)
     attributeParser.parse()
 
     # Close the file
     LDIFFile.close()
-    primaryLogger.debug("Closed file <%s>" % filename)
+    if verbose:
+        print("Closed file <%s>" % filename)
 
     # Return the dictionary of attributes. The key is the attribute name. The value is the
     # maximum number of times that value appears
@@ -215,10 +218,17 @@ def generateCSV(
     fieldSeparatorCharacter=",",
     textDelimiter='"',
     maximumColumns=5,
+    verbose=False,
 ):
     # Open the LDIF file for reading
     LDIFFile = open(filename, "rb")
-    primaryLogger.debug("Opened <%s> for reading" % filename)
+
+    if verbose:
+        print("Opened <%s> for reading" % filename)
+
+    # this ... isn't great, but occasionally useful
+    if not textDelimiter:
+        textDelimiter = ""
 
     # Create an instance of the attribute parser which will handle LDIF entries
     CSVParser = LDIFCSVParser(LDIFFile, attributeDictionary, output)
@@ -259,32 +269,8 @@ def generateCSV(
     LDIFFile.close()
 
 
-def setupLogging(logfilename=""):
-    # Create the primaryLogger as a global variable
-    global primaryLogger
-    primaryLogger = logging.Logger("primaryLogger", logging.DEBUG)
-
-    # Create a handler to print to the log
-    if logfilename != "":
-        fileHandler = logging.FileHandler(logfilename, "w", encoding=None, delay=0)
-    else:
-        fileHandler = NullHandler()
-
-    # Set how the handler will print the pretty log events
-    primaryLoggerFormat = logging.Formatter(
-        "[%(asctime)s][%(funcName)s] - %(message)s", "%m/%d/%y %I:%M%p"
-    )
-    fileHandler.setFormatter(primaryLoggerFormat)
-
-    # Append handler to the primaryLoggyouer
-    primaryLogger.addHandler(fileHandler)
-
-
 # Primary function call
 def main():
-
-    # Setup logging to /dev/null incase no log file is specified
-    setupLogging()
 
     # Variables to extract from command line (set the defaults here)
     outputFilename = ""
@@ -302,13 +288,6 @@ def main():
         help="File to write output. By default this is set to sys.stdout",
     )
     parser.add_argument(
-        "-l",
-        "--logging",
-        type=str,
-        nargs="?",
-        help="File to write logging output. By default there is no logging.",
-    )
-    parser.add_argument(
         "-F",
         "--fieldsep",
         type=str,
@@ -321,7 +300,7 @@ def main():
         "--delimiter",
         type=str,
         nargs="?",
-        default='""',
+        default='"',
         help='Character to delimit the text value by. By default this is a double quote. i.e. -D"""',
     )
     parser.add_argument(
@@ -338,14 +317,12 @@ def main():
     parser.add_argument(
         "-v", "--verbose", action="store_true", default=False, help="increase verbosity"
     )
+
     args = parser.parse_args()
 
-    # Setup logging
-    if args.logging:
-        setupLogging(logfilename=args.logging)
-        if args.verbose:
-            primaryLogger.debug("Logging initiated")
-    
+    if args.verbose:
+        print("Logging initiated")
+
     inputFilename = args.input
     outputFilename = args.output
     fieldSeparatorCharacter = args.fieldsep
@@ -353,16 +330,15 @@ def main():
     maximumColumns = args.maxcols
 
     if args.verbose:
-        primaryLogger.debug("outputFilename: %s" % outputFilename)
-        primaryLogger.debug("fieldSeparatorCharacter: %s" % fieldSeparatorCharacter)
-        primaryLogger.debug("textDelimiter: %s" % textDelimiter)
-        primaryLogger.debug("maximumColumns: %d" % maximumColumns)
-
+        print("outputFilename: %s" % outputFilename)
+        print("fieldSeparatorCharacter: %s" % fieldSeparatorCharacter)
+        print("textDelimiter: %s" % textDelimiter)
+        print("maximumColumns: %d" % maximumColumns)
 
     # First pass obtains the attributes inside the LDIF
-    attributeDictionary = parseLDIFAttributes(inputFilename)
+    attributeDictionary = parseLDIFAttributes(inputFilename, args.verbose)
     if args.verbose:
-        primaryLogger.debug("Parsed attribute dictionary: " + repr(attributeDictionary))
+        print("Parsed attribute dictionary: " + repr(attributeDictionary))
 
     # Default output is stdout
     output = sys.stdout
