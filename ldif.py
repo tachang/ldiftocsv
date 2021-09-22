@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 ldif - generate and parse LDIF data (see RFC 2849)
 
@@ -13,7 +14,7 @@ __version__ = '0.5.5'
 
 __all__ = [
   # constants
-  'ldif_pattern',
+  #'ldif_pattern',
   # functions
   'AttrTypeandValueLDIF','CreateLDIF','ParseLDIF',
   # classes
@@ -28,14 +29,16 @@ import base64
 import re
 import types
 import io
+import codecs
 
 attrtype_pattern = r'[\w;.]+(;[\w_-]+)*'
 attrvalue_pattern = r'(([^,]|\\,)+|".*?")'
 rdn_pattern = attrtype_pattern + r'[ ]*=[ ]*' + attrvalue_pattern
 dn_pattern   = rdn_pattern + r'([ ]*,[ ]*' + rdn_pattern + r')*[ ]*'
-dn_regex   = re.compile('^%s$' % dn_pattern)
+dn_regex   = re.compile(r'^' + dn_pattern + r'$')
+dn_regex_bytes   = re.compile('^' + dn_pattern + '$')
 
-ldif_pattern = '^((dn(:|::) %(dn_pattern)s)|(%(attrtype_pattern)s(:|::) .*)$)+' % vars()
+# ldif_pattern = r'^((dn(:|::) %(dn_pattern)s)|(%(attrtype_pattern)s(:|::) .*)$)+' % vars()
 
 MOD_OP_INTEGER = {
   'add':0,'delete':1,'replace':2
@@ -51,7 +54,7 @@ for c in CHANGE_TYPES:
   valid_changetype_dict[c]=None
 
 
-SAFE_STRING_PATTERN = '(^(\000|\n|\r| |:|<)|[\000\n\r\200-\377]+|[ ]+$)'
+SAFE_STRING_PATTERN = r'(^(\000|\n|\r| |:|<)|[\000\n\r\200-\377]+|[ ]+$)'
 safe_string_re = re.compile(SAFE_STRING_PATTERN)
 
 def is_dn(s):
@@ -60,12 +63,11 @@ def is_dn(s):
   """
   if s=='':
     return 1
-  # those darn umlauts
-  encoded = s.encode('raw-unicode-escape')
-  new_s = str(encoded.decode('utf-8'))
-  rm = dn_regex.match(new_s)
-#   print("regex match", rm)
-#   print("new string", new_s)
+  new_s = codecs.escape_decode(s)[0].decode("utf-8")
+  # this turns out to create a literal b'UNICODE HERE' string
+  # but at least you get the right unicode
+  new_s = new_s.replace("b'", "").rstrip("'")
+  rm = dn_regex_bytes.match(new_s)
   return rm!=None and rm.group(0)==new_s
 
 
@@ -331,7 +333,7 @@ class LDIFParser:
     if value_spec=='::':
       # attribute value needs base64-decoding
 #      attr_value = base64.decodestring(unfolded_line[colon_pos+2:])
-      attr_value = str(base64.b64decode(bytes(unfolded_line[colon_pos+2:], "utf=8")))
+      attr_value = str(base64.b64decode(bytes(unfolded_line[colon_pos+2:], "utf-8")))
       #attr_value = unfolded_line[colon_pos+2:]
     elif value_spec==':<':
       # fetch attribute value from URL
