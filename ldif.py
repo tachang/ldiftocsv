@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 ldif - generate and parse LDIF data (see RFC 2849)
 
@@ -13,7 +14,7 @@ __version__ = '0.5.5'
 
 __all__ = [
   # constants
-  'ldif_pattern',
+  #'ldif_pattern',
   # functions
   'AttrTypeandValueLDIF','CreateLDIF','ParseLDIF',
   # classes
@@ -23,20 +24,21 @@ __all__ = [
   'LDIFCopy',
 ]
 
-import urlparse,urllib,base64,re,types
-
-try:
-  from cStringIO import StringIO
-except ImportError:
-  from StringIO import StringIO
+import urllib
+import base64
+import re
+import types
+import io
+import codecs
 
 attrtype_pattern = r'[\w;.]+(;[\w_-]+)*'
 attrvalue_pattern = r'(([^,]|\\,)+|".*?")'
 rdn_pattern = attrtype_pattern + r'[ ]*=[ ]*' + attrvalue_pattern
 dn_pattern   = rdn_pattern + r'([ ]*,[ ]*' + rdn_pattern + r')*[ ]*'
-dn_regex   = re.compile('^%s$' % dn_pattern)
+dn_regex   = re.compile(r'^' + dn_pattern + r'$')
+dn_regex_bytes   = re.compile('^' + dn_pattern + '$')
 
-ldif_pattern = '^((dn(:|::) %(dn_pattern)s)|(%(attrtype_pattern)s(:|::) .*)$)+' % vars()
+# ldif_pattern = r'^((dn(:|::) %(dn_pattern)s)|(%(attrtype_pattern)s(:|::) .*)$)+' % vars()
 
 MOD_OP_INTEGER = {
   'add':0,'delete':1,'replace':2
@@ -52,7 +54,7 @@ for c in CHANGE_TYPES:
   valid_changetype_dict[c]=None
 
 
-SAFE_STRING_PATTERN = '(^(\000|\n|\r| |:|<)|[\000\n\r\200-\377]+|[ ]+$)'
+SAFE_STRING_PATTERN = r'(^(\000|\n|\r| |:|<)|[\000\n\r\200-\377]+|[ ]+$)'
 safe_string_re = re.compile(SAFE_STRING_PATTERN)
 
 def is_dn(s):
@@ -61,8 +63,12 @@ def is_dn(s):
   """
   if s=='':
     return 1
-  rm = dn_regex.match(s)
-  return rm!=None and rm.group(0)==s
+  new_s = codecs.escape_decode(s)[0].decode("utf-8")
+  # this turns out to create a literal b'UNICODE HERE' string
+  # but at least you get the right unicode
+  new_s = new_s.replace("b'", "").rstrip("'")
+  rm = dn_regex_bytes.match(new_s)
+  return rm!=None and rm.group(0)==new_s
 
 
 def needs_base64(s):
@@ -134,7 +140,7 @@ class LDIFWriter:
     attr_value
           attribute value
     """
-    if self._base64_attrs.has_key(attr_type.lower()) or \
+    if attr_type.lower() in self._base64_attrs or \
        needs_base64(attr_value):
       # Encode with base64
       self._unfoldLDIFLine(':: '.join([attr_type,base64.encodestring(attr_value).replace('\n','')]))
@@ -164,7 +170,7 @@ class LDIFWriter:
     elif mod_len==3:
       changetype = 'modify'
     else:
-      raise ValueError,"modlist item of wrong length"
+      raise ValueError("modlist item of wrong length")
     self._unparseAttrTypeandValue('changetype',changetype)
     for mod in modlist:
       if mod_len==2:
@@ -173,7 +179,7 @@ class LDIFWriter:
         mod_op,mod_type,mod_vals = mod
         self._unparseAttrTypeandValue(MOD_OP_STR[mod_op],mod_type)
       else:
-        raise ValueError,"Subsequent modlist item of wrong length"
+        raise ValueError("Subsequent modlist item of wrong length")
       if mod_vals:
         for mod_val in mod_vals:
           self._unparseAttrTypeandValue(mod_type,mod_val)
@@ -199,7 +205,7 @@ class LDIFWriter:
     elif isinstance(record,types.ListType):
       self._unparseChangeRecord(record)
     else:
-      raise ValueError, "Argument record must be dictionary or list"
+      raise ValueError("Argument record must be dictionary or list")
     # Write empty line separating the records
     self._output_file.write(self._line_sep)
     # Count records written
@@ -223,7 +229,7 @@ def CreateLDIF(dn,record,base64_attrs=None,cols=76):
         Specifies how many columns a line may have before it's
         folded into many lines.
   """
-  f = StringIO()
+  f = io.BytesIO()
   ldif_writer = LDIFWriter(f,base64_attrs,cols,'\n')
   ldif_writer.unparse(dn,record)
   s = f.getvalue()
@@ -293,8 +299,12 @@ class LDIFParser:
     """
     Unfold several folded lines with trailing space into one line
     """
-    unfolded_lines = [ self._stripLineSep(self._line) ]
-    self._line = self._input_file.readline()
+    # do we have strings or bytes?
+    try:
+      unfolded_lines = [ self._stripLineSep(str(self._line, 'utf-8')) ]
+    except TypeError:
+      unfolded_lines = [ self._stripLineSep(self._line) ]
+    self._line = self._input_file.readline().decode('utf-8')
     while self._line and self._line[0]==' ':
       unfolded_lines.append(self._stripLineSep(self._line[1:]))
       self._line = self._input_file.readline()
@@ -322,15 +332,16 @@ class LDIFParser:
     value_spec = unfolded_line[colon_pos:colon_pos+2]
     if value_spec=='::':
       # attribute value needs base64-decoding
-      attr_value = base64.decodestring(unfolded_line[colon_pos+2:])
+#      attr_value = base64.decodestring(unfolded_line[colon_pos+2:])
+      attr_value = str(base64.b64decode(bytes(unfolded_line[colon_pos+2:], "utf-8")))
       #attr_value = unfolded_line[colon_pos+2:]
     elif value_spec==':<':
       # fetch attribute value from URL
       url = unfolded_line[colon_pos+2:].strip()
       attr_value = None
       if self._process_url_schemes:
-        u = urlparse.urlparse(url)
-        if self._process_url_schemes.has_key(u[0]):
+        u = urllib.parse.urlparse(url)
+        if u[0] in self._process_url_schemes:
           attr_value = urllib.urlopen(url).read()
     elif value_spec==':\r\n' or value_spec=='\n':
       attr_value = ''
@@ -356,25 +367,24 @@ class LDIFParser:
         if attr_type=='dn':
           # attr type and value pair was DN of LDIF record
           if dn!=None:
-	    raise ValueError, 'Two lines starting with dn: in one record.'
+	          raise ValueError('Two lines starting with dn: in one record.')
           if not is_dn(attr_value):
-	    raise ValueError, 'No valid string-representation of distinguished name %s.' % (repr(attr_value))
+	          raise ValueError('No valid string-representation of distinguished name %s.' % (repr(attr_value)))
           dn = attr_value
         elif attr_type=='version' and dn is None:
           version = 1
         elif attr_type=='changetype':
           # attr type and value pair was DN of LDIF record
           if dn is None:
-	    raise ValueError, 'Read changetype: before getting valid dn: line.'
+	          raise ValueError('Read changetype: before getting valid dn: line.')
           if changetype!=None:
-	    raise ValueError, 'Two lines starting with changetype: in one record.'
-          if not valid_changetype_dict.has_key(attr_value):
-	    raise ValueError, 'changetype value %s is invalid.' % (repr(attr_value))
+	          raise ValueError('Two lines starting with changetype: in one record.')
+          if attr_value not in valid_changetype_dict:
+	          raise ValueError('changetype value %s is invalid.' % (repr(attr_value)))
           changetype = attr_value
-        elif attr_value!=None and \
-             not self._ignored_attr_types.has_key(attr_type.lower()):
+        elif attr_value!=None and attr_type.lower() not in self._ignored_attr_types:
           # Add the attribute to the entry if not ignored attribute
-          if entry.has_key(attr_type):
+          if attr_type in entry:
             entry[attr_type].append(attr_value)
           else:
             entry[attr_type]=[attr_value]

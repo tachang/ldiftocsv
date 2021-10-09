@@ -1,5 +1,7 @@
 from distutils.core import setup
-import py2exe, sys, os
+import sys, os
+import platform
+
 
 manifest = """
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -16,13 +18,14 @@ manifest = """
 </assembly>
 """
 
-setup(
-    console = [
-        {
-            "script": "LDIFtoCSV.py",
-            "other_resources": [(24,1,manifest)]
-        }
-    ],
-    options = {'py2exe': {'bundle_files': 1}},
-    zipfile = None
-)
+if platform.system() == "Windows":
+    import py2exe
+
+    setup(
+        name="ldiftocsv",
+        console=[{"script": "LDIFtoCSV.py", "other_resources": [(24, 1, manifest)]}],
+        options={"py2exe": {"bundle_files": 1}},
+        zipfile=None,
+    )
+else:
+    setup(name="ldiftocsv", scripts=["ldiftocsv.py"], py_modules=["ldif"])
